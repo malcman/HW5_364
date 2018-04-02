@@ -42,16 +42,16 @@ manager.add_command('db', MigrateCommand)
 on_list = db.Table('on_list',db.Column('item_id',db.Integer, db.ForeignKey('items.id')),db.Column('list_id',db.Integer, db.ForeignKey('lists.id')))
 
 class TodoList(db.Model):
-    __tablename__ = "lists"
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(225))
-    items = db.relationship('TodoItem',secondary=on_list,backref=db.backref('lists',lazy='dynamic'),lazy='dynamic')
+	__tablename__ = "lists"
+	id = db.Column(db.Integer, primary_key=True)
+	title = db.Column(db.String(225))
+	items = db.relationship('TodoItem',secondary=on_list,backref=db.backref('lists',lazy='dynamic'),lazy='dynamic')
 
 class TodoItem(db.Model):
-    __tablename__ = "items"
-    id = db.Column(db.Integer, primary_key=True)
-    description = db.Column(db.String(225))
-    priority = db.Column(db.Integer)
+	__tablename__ = "items"
+	id = db.Column(db.Integer, primary_key=True)
+	description = db.Column(db.String(225))
+	priority = db.Column(db.Integer)
 
 
 ########################
@@ -60,24 +60,30 @@ class TodoItem(db.Model):
 
 # Provided - Form to create a todo list
 class TodoListForm(FlaskForm):
-    name = StringField("What is the title of this TODO List?", validators=[Required()])
-    items = TextAreaField("Enter your TODO list items in the following format: Description, Priority -- separated by newlines")
-    submit = SubmitField("Submit")
+	name = StringField("What is the title of this TODO List?", validators=[Required()])
+	items = TextAreaField("Enter your TODO list items in the following format: Description, Priority -- separated by newlines")
+	submit = SubmitField("Submit")
 
 # 364: Define an UpdateButtonForm class for use to update todo items
 class UpdateButtonForm(FlaskForm):
-    submit = SubmitField('Update')
+	submit = SubmitField('Update')
 
 
 # 364: Define a form class for updating the priority of a todolist item
 #(HINT: What class activity you have done before is this similar to?)
 class UpdateInfoForm(FlaskForm):
-    new_priority = StringField("What is the new priority of this item?", validators=[Required()])
-    submit = SubmitField('Update')
+	new_priority = StringField("What is the new priority of this item?", validators=[Required()])
+	submit = SubmitField('Update')
 
 # 364: Define a DeleteButtonForm class for use to delete todo items
 class DeleteButtonForm(FlaskForm):
-    submit = SubmitField('Delete')
+	submit = SubmitField('Delete')
+
+# aadl_feature: add new item to existing list
+class AddItemForm(FlaskForm):
+	items = TextAreaField("Enter new TODO list items in the following format: Description, Priority -- separated by newlines")
+	submit = SubmitField("Add")
+
 
 
 
@@ -88,26 +94,28 @@ class DeleteButtonForm(FlaskForm):
 ## Provided.
 
 def get_or_create_item(item_string):
-    elements = [x.strip().rstrip() for x in item_string.split(",")]
-    item = TodoItem.query.filter_by(description=elements[0]).first()
-    if item:
-        return item
-    else:
-        item = TodoItem(description=elements[0],priority=elements[-1])
-        db.session.add(item)
-        db.session.commit()
-        return item
+	elements = [x.strip().rstrip() for x in item_string.split(",")]
+	item = TodoItem.query.filter_by(description=elements[0]).first()
+	if item:
+		return item
+	else:
+		item = TodoItem(description=elements[0],priority=elements[-1])
+		db.session.add(item)
+		db.session.commit()
+		return item
 
 def get_or_create_todolist(title, item_strings=[]):
-    l = TodoList.query.filter_by(title=title).first()
-    if not l:
-        l = TodoList(title=title)
-    for s in item_strings:
-        item = get_or_create_item(s)
-        l.items.append(item)
-    db.session.add(l)
-    db.session.commit()
-    return l
+	l = TodoList.query.filter_by(title=title).first()
+	if not l:
+		print('made new list')
+		l = TodoList(title=title)
+	for s in item_strings:
+		item = get_or_create_item(s)
+		l.items.append(item)
+		print('appended {}'.format(item))
+	db.session.add(l)
+	db.session.commit()
+	return l
 
 
 ###################################
@@ -117,21 +125,21 @@ def get_or_create_todolist(title, item_strings=[]):
 # Provided
 @app.route('/', methods=["GET","POST"])
 def index():
-    form = TodoListForm()
-    if request.method=="POST":
-        title = form.name.data
-        items_data = form.items.data
-        new_list = get_or_create_todolist(title, items_data.split("\n"))
-        return redirect(url_for('all_lists'))
-    return render_template('index.html',form=form)
+	form = TodoListForm()
+	if request.method=="POST":
+		title = form.name.data
+		items_data = form.items.data
+		new_list = get_or_create_todolist(title, items_data.split("\n"))
+		return redirect(url_for('all_lists'))
+	return render_template('index.html',form=form)
 
 # Provided - see below for additional 
 @app.route('/all_lists',methods=["GET","POST"])
 def all_lists():
-    form = DeleteButtonForm()
-    form_del = DeleteButtonForm()
-    lsts = TodoList.query.all()
-    return render_template('all_lists.html',todo_lists=lsts, form=form, formdel = form_del)
+	form = DeleteButtonForm()
+	form_del = DeleteButtonForm()
+	lsts = TodoList.query.all()
+	return render_template('all_lists.html',todo_lists=lsts, form=form, formdel = form_del)
 
 # 364: Update the all_lists.html template and the all_lists view function such that there is a delete button available for each ToDoList saved.
 # When you click on the delete button for each list, that list should get deleted -- this is also addressed in a later TODO.
@@ -139,10 +147,19 @@ def all_lists():
 # Provided - see below for additional 
 @app.route('/list/<ident>',methods=["GET","POST"])
 def one_list(ident):
-    form = UpdateButtonForm()
-    lst = TodoList.query.filter_by(id=ident).first()
-    items = lst.items.all()
-    return render_template('list_tpl.html',todolist=lst,items=items,form=form)
+	form = UpdateButtonForm()
+	addForm = AddItemForm()
+	lst = TodoList.query.filter_by(id=ident).first()
+	items = lst.items.all()
+	items.sort(key=lambda x: x.description.lower())
+	items.sort(key=lambda x: x.priority)
+	if addForm.validate_on_submit():
+		print("ADDFORM VALIDATED")
+		items_data = addForm.items.data
+		new_list = get_or_create_todolist(lst.title, items_data.split("\n"))
+		flash("Added {} items to {} TODO list".format(len(items_data.split("\n")), lst.title))
+		return redirect(url_for("one_list", ident=lst.id))
+	return render_template('list_tpl.html',todolist=lst,items=items,form=form,addForm=addForm)
 # 364: Update the one_list view function and the list_tpl.html view file so that there is an Update button next to each todolist item, and the priority integer of that item can be updated. (This is also addressed in later TODOs.)
 # HINT: These template updates are minimal, but that small update(s) make(s) a big change in what you can do in the app! Check out the examples from previous classes for help.
 
@@ -150,37 +167,37 @@ def one_list(ident):
 # 364: Complete route to update an individual ToDo item's priority
 @app.route('/update/<item>',methods=["GET","POST"])
 def update(item):
-    # This code should use the form you created above for updating the specific item and manage the process of updating the item's priority.
-    # Once it is updated, it should redirect to the page showing all the links to todo lists.
-    # It should flash a message: Updated priority of <the description of that item>
-    # HINT: What previous class example is extremely similar?
-    # TODO additional feature: update all other priorities
-    form = UpdateInfoForm()
-    if form.validate_on_submit():
-        new_priority = form.new_priority.data
-        todo = TodoItem.query.filter_by(id=item).first()
-        todo.priority = new_priority
-        db.session.commit()
-        print(type(todo))
-        flash('Updated priority of {} to {}'.format(todo.description, new_priority))
-        return redirect(url_for('all_lists'))
-    return render_template('update_item.html', id=item, form=form)
+	# This code should use the form you created above for updating the specific item and manage the process of updating the item's priority.
+	# Once it is updated, it should redirect to the page showing all the links to todo lists.
+	# It should flash a message: Updated priority of <the description of that item>
+	# HINT: What previous class example is extremely similar?
+	# TODO additional feature: update all other priorities
+	form = UpdateInfoForm()
+	if form.validate_on_submit():
+		new_priority = form.new_priority.data
+		todo = TodoItem.query.filter_by(id=item).first()
+		todo.priority = new_priority
+		db.session.commit()
+		print(type(todo))
+		flash('Updated priority of {} to {}'.format(todo.description, new_priority))
+		return redirect(url_for('all_lists'))
+	return render_template('update_item.html', id=item, form=form)
 
 # 364: Fill in the update_item.html template to work properly with this update route. (HINT: Compare against example!)
 
 # 364: Complete route to delete a whole ToDoList
 @app.route('/delete/<lst>',methods=["GET","POST"])
 def delete(lst):
-    # This code should successfully delete the appropriate todolist
-    # Should flash a message about what was deleted, e.g. Deleted list <title of list>
-    # And should redirect the user to the page showing all the todo lists
-    # HINT: Compare against what you've done for updating and class notes -- the goal here is very similar, and in some ways simpler.
-    toDelete = TodoList.query.filter_by(title = lst).first()
-    if toDelete:
-    	db.session.delete(toDelete)
-    	flash("Deleted list {}".format(toDelete.title))
-    return redirect(url_for('all_lists'))
+	# This code should successfully delete the appropriate todolist
+	# Should flash a message about what was deleted, e.g. Deleted list <title of list>
+	# And should redirect the user to the page showing all the todo lists
+	# HINT: Compare against what you've done for updating and class notes -- the goal here is very similar, and in some ways simpler.
+	toDelete = TodoList.query.filter_by(title = lst).first()
+	if toDelete:
+		db.session.delete(toDelete)
+		flash("Deleted list {}".format(toDelete.title))
+	return redirect(url_for('all_lists'))
 
 if __name__ == "__main__":
-    db.create_all()
-    manager.run()
+	db.create_all()
+	manager.run()

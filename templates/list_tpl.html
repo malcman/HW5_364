@@ -19,6 +19,12 @@
 {% endfor %}
 </ul>
 
+<form method="POST" action="/list/ {{ todolist.id }}">
+	{{ addForm.hidden_tag() }}
+	{{ addForm.items.label }} {{ addForm.items() }}
+	{{ addForm.submit() }}
+</form>
+
 <div>
 {% for message in get_flashed_messages() %}
 <strong>*** {{ message }} ***</strong>
